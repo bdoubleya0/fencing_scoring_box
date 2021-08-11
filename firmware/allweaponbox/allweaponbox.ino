@@ -19,7 +19,7 @@
 //============
 //TODO: set up debug levels correctly
 #define DEBUG 0
-//#define TEST_LIGHTS       // turns on lights for a second on start up
+#define TEST_LIGHTS       // turns on lights for a second on start up
 //#define TEST_ADC_SPEED    // used to test sample rate of ADCs
 //#define REPORT_TIMING     // prints timings over serial interface
 #define BUZZERTIME  1000  // length of time the buzzer is kept on after a hit (ms)
@@ -116,7 +116,7 @@ void setup() {
    pinMode(modePin, INPUT_PULLUP);
 
    // add the interrupt to the mode pin (interrupt is pin 0)
-   attachInterrupt(modePin-2, changeMode, FALLING);
+   attachInterrupt(digitalPinToInterrupt(modePin), changeMode, CHANGE);
    pinMode(modeLeds[0], OUTPUT);
    pinMode(modeLeds[1], OUTPUT);
    pinMode(modeLeds[2], OUTPUT);
@@ -216,7 +216,15 @@ void loop() {
 //=====================
 void changeMode() {
    // set a flag to keep the time in the ISR to a min
-   modeJustChangedFlag = true;
+  static unsigned long last_interrupt_time = 0;
+  unsigned long interrupt_time = millis();
+  // If interrupts come faster than 200ms, assume it's a bounce and ignore
+  if (interrupt_time - last_interrupt_time > 200) 
+  {
+      modeJustChangedFlag = true;
+  }
+  last_interrupt_time = interrupt_time;
+
 }
 
 
@@ -225,14 +233,19 @@ void changeMode() {
 //============================
 void setModeLeds() {
    if (currentMode == FOIL_MODE) {
-      digitalWrite(onTargetA, HIGH);
+      digitalWrite(modeLeds[0], HIGH);
+      digitalWrite(modeLeds[1], LOW);
+      digitalWrite(modeLeds[2], LOW);
    } else {
       if (currentMode == EPEE_MODE) {
-        digitalWrite(onTargetB, HIGH);
+        digitalWrite(modeLeds[0], LOW);
+        digitalWrite(modeLeds[1], HIGH);
+        digitalWrite(modeLeds[2], LOW);
       } else {
          if (currentMode == SABRE_MODE){
-            digitalWrite(onTargetA, HIGH);
-            digitalWrite(onTargetB, HIGH);
+            digitalWrite(modeLeds[0], LOW);
+            digitalWrite(modeLeds[1], LOW);
+            digitalWrite(modeLeds[2], HIGH);
          }
       }
    }
@@ -247,12 +260,10 @@ void setModeLeds() {
 //========================
 void checkIfModeChanged() {
  if (modeJustChangedFlag) {
-      if (digitalRead(modePin)) {
-         if (currentMode == 2)
-            currentMode = 0;
-         else
-            currentMode++;
-      }
+      if (currentMode == 2)
+        currentMode = 0;
+      else
+        currentMode++;
       setModeLeds();
 #ifdef DEBUG
       Serial.print("Mode changed to: ");
